@@ -88,5 +88,19 @@ confusionMatrix(predictionsA1, myTesting$classe)
 ```
 
 
+```{r}
+
+set.seed(12345)
+controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+modFitRandForest <- train(classe ~ ., data=myTraining, method="rf",
+                          trControl=controlRF)
+modFitRandForest$finalModel
+
+# prediction on Test dataset
+predictRandForest <- predict(modFitRandForest, newdata=myTesting)
+confMatRandForest <- confusionMatrix(predictRandForest, myTesting$classe)
+confMatRandForest
+
+```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
