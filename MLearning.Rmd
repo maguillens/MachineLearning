@@ -87,7 +87,7 @@ predictionsA1 <- predict(modFitA1, myTesting, type = "class")
 confusionMatrix(predictionsA1, myTesting$classe)
 ```
 
-
+##Using ML algorithms for prediction: Random Forest
 ```{r}
 
 set.seed(12345)
