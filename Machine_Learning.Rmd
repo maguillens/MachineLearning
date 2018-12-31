@@ -1,0 +1,113 @@
+---
+title: "MLearning"
+author: "mags21"
+date: "30 de diciembre de 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Getting and cleaning data
+
+
+```{r}
+
+library(knitr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(randomForest)
+library(corrplot)
+set.seed(12345)
+
+#setwd("C:/Users/MIGUEL GUILLEN/Documents/R")
+setwd("C:/Users/MIGUEL GUILLEN/Documents/GitHub/MachineLearning")
+
+set.seed(1234)
+
+#Load data to memory
+Ttrain <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+Ttest <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+
+
+```
+
+##Partioning the training set into two
+```{r}
+
+# create a partition with the training dataset 
+pTrain  <- createDataPartition(Ttrain$classe, p=0.7, list=FALSE)
+Train_Set <- Ttrain[pTrain, ]
+Test_Set  <- Ttrain[-pTrain, ]
+
+dim(Train_Set)
+dim(Test_Set)
+
+```
+
+
+##Cleaning the data
+```{r}
+
+# 160 variables. Those variables have plenty of NA
+# The Near Zero variance (NearZV) variables are also removed.
+
+# remove variables with Nearly Zero Variance
+NearZV <- nearZeroVar(Train_Set)
+Train_Set <- Train_Set[, -NearZV]
+Test_Set  <- Test_Set[, -NearZV]
+dim(Train_Set)
+dim(Test_Set)
+# 30 variables removed
+
+
+# remove variables +95% NA
+FullNA    <- sapply(Train_Set, function(x) mean(is.na(x))) > 0.95
+Train_Set <- Train_Set[, FullNA==FALSE]
+Test_Set  <- Test_Set[, FullNA==FALSE]
+dim(Train_Set)
+dim(Test_Set)
+# 71 variables removed 
+
+# remove identification only variables (columns 1 to 5)
+Train_Set <- Train_Set[, -(1:5)]
+Test_Set  <- Test_Set[, -(1:5)]
+dim(Train_Set)
+dim(Test_Set)
+
+```
+
+##Using ML algorithms for prediction: Decision Tree
+```{r}
+set.seed(12345)
+MDTree <- rpart(classe ~ ., data=Train_Set, method="class")
+fancyRpartPlot(MDTree)
+
+# prediction on Test dataset
+PTree <- predict(MDTree, newdata=Test_Set, type="class")
+confMatDecTree <- confusionMatrix(PTree, Test_Set$classe)
+confMatDecTree
+confMatDecTree$overall['Accuracy']
+
+```
+
+##Using ML algorithms for prediction: Random Forest
+```{r}
+
+RF_C <- trainControl(method="cv", number=3, verboseIter=FALSE)
+MRandForest <- train(classe ~ ., data=Train_Set, method="rf",
+                          trControl=RF_C)
+MRandForest$finalModel
+
+# prediction on Test dataset
+PRandForest <- predict(MRandForest, newdata=Test_Set)
+confMatRandForest <- confusionMatrix(PRandForest, Test_Set$classe)
+confMatRandForest
+confMatRandForest$overall['Accuracy']
+
+```
+
+For this case the best model is Random Forest because the accuracy is 0.9964316, betther than Decision Tree.

@@ -14,21 +14,23 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 
+library(knitr)
 library(caret)
-library(randomForest)
 library(rpart)
 library(rpart.plot)
-library(RColorBrewer)
 library(rattle)
-library(e1071)
+library(randomForest)
+library(corrplot)
+set.seed(12345)
 
-setwd("C:/Users/MIGUEL GUILLEN/Documents/R")
+#setwd("C:/Users/MIGUEL GUILLEN/Documents/R")
+setwd("C:/Users/MIGUEL GUILLEN/Documents/GitHub/MachineLearning")
 
 set.seed(1234)
 
 #Load data to memory
-training <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))
-testing <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+Ttrain <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+Ttest <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
 
 
 ```
@@ -36,11 +38,13 @@ testing <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
 ##Partioning the training set into two
 ```{r}
 
-inTrain <- createDataPartition(y=training$classe, p=0.6, list=FALSE)
-myTraining <- training[inTrain, ] 
-myTesting <- training[-inTrain, ]
-dim(myTraining) 
-dim(myTesting)
+# create a partition with the training dataset 
+pTrain  <- createDataPartition(Ttrain$classe, p=0.7, list=FALSE)
+Train_Set <- Ttrain[pTrain, ]
+Test_Set  <- Ttrain[-pTrain, ]
+
+dim(Train_Set)
+dim(Test_Set)
 
 ```
 
@@ -48,59 +52,62 @@ dim(myTesting)
 ##Cleaning the data
 ```{r}
 
+# 160 variables. Those variables have plenty of NA
+# The Near Zero variance (NearZV) variables are also removed.
+
+# remove variables with Nearly Zero Variance
+NearZV <- nearZeroVar(Train_Set)
+Train_Set <- Train_Set[, -NearZV]
+Test_Set  <- Test_Set[, -NearZV]
+dim(Train_Set)
+dim(Test_Set)
+# 30 variables removed
 
 
-myTraining <- myTraining[c(-1)]
+# remove variables +95% NA
+FullNA    <- sapply(Train_Set, function(x) mean(is.na(x))) > 0.95
+Train_Set <- Train_Set[, FullNA==FALSE]
+Test_Set  <- Test_Set[, FullNA==FALSE]
+dim(Train_Set)
+dim(Test_Set)
+# 71 variables removed 
 
-#Cleaning Variables with too many NAs. For Variables that have more than a 60% threshold of NA's I'm going to leave them out:
-
-trainingV3 <- myTraining #creating another subset to iterate in loop
-for(i in 1:length(myTraining)) { #for every column in the training dataset
-        if( sum( is.na( myTraining[, i] ) ) /nrow(myTraining) >= .6 ) { #if n?? NAs > 60% of total observations
-        for(j in 1:length(trainingV3)) {
-            if( length( grep(names(myTraining[i]), names(trainingV3)[j]) ) ==1)  { #if the columns are the same:
-                trainingV3 <- trainingV3[ , -j] #Remove that column
-            }   
-        } 
-    }
-}
-#To check the new N?? of observations
-dim(trainingV3)
-
-clean1 <- colnames(myTraining)
-clean2 <- colnames(myTraining[, -58]) #already with classe column removed
-myTesting <- myTesting[clean1]
-#testing <- testing[clean2]
-
-#To check the new N?? of observations
-dim(myTesting)
-
+# remove identification only variables (columns 1 to 5)
+Train_Set <- Train_Set[, -(1:5)]
+Test_Set  <- Test_Set[, -(1:5)]
+dim(Train_Set)
+dim(Test_Set)
 
 ```
 
 ##Using ML algorithms for prediction: Decision Tree
 ```{r}
-modFitA1 <- rpart(classe ~ ., data=myTraining, method="class")
-fancyRpartPlot(modFitA1)
+set.seed(12345)
+MDTree <- rpart(classe ~ ., data=Train_Set, method="class")
+fancyRpartPlot(MDTree)
 
-predictionsA1 <- predict(modFitA1, myTesting, type = "class")
-confusionMatrix(predictionsA1, myTesting$classe)
+# prediction on Test dataset
+PTree <- predict(MDTree, newdata=Test_Set, type="class")
+confMatDecTree <- confusionMatrix(PTree, Test_Set$classe)
+confMatDecTree
+confMatDecTree$overall['Accuracy']
+
 ```
 
 ##Using ML algorithms for prediction: Random Forest
 ```{r}
 
-set.seed(12345)
-controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
-modFitRandForest <- train(classe ~ ., data=myTraining, method="rf",
-                          trControl=controlRF)
-modFitRandForest$finalModel
+RF_C <- trainControl(method="cv", number=3, verboseIter=FALSE)
+MRandForest <- train(classe ~ ., data=Train_Set, method="rf",
+                          trControl=RF_C)
+MRandForest$finalModel
 
 # prediction on Test dataset
-predictRandForest <- predict(modFitRandForest, newdata=myTesting)
-confMatRandForest <- confusionMatrix(predictRandForest, myTesting$classe)
+PRandForest <- predict(MRandForest, newdata=Test_Set)
+confMatRandForest <- confusionMatrix(PRandForest, Test_Set$classe)
 confMatRandForest
+confMatRandForest$overall['Accuracy']
 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+For this case the best model is Random Forest because the accuracy is 0.9964316, betther than Decision Tree.
